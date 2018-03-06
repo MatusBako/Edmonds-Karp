@@ -1,7 +1,9 @@
 module GraphData where
 
-import qualified Data.Map as Map
 import Data.List as List
+import qualified Data.Map as Map
+import Data.Maybe
+import Data.Ord
 import Debug.Trace
 
 ------- DATA TYPES ---------
@@ -57,14 +59,33 @@ getNodeNeighbourds :: [TEdge] -> Node -> [Node]
 getNodeNeighbourds edges node = 
     map (\(Edge x y) -> y) $ filter (\(Edge x y) -> x == node) edges
 
-
 ------- OPERATIONS ---------
 
 invertEdge :: TEdge -> TEdge
 invertEdge (Edge x y) = Edge y x
 
-bfs ::  TGraph -> Node -> Path
-bfs g n = findBfs g n [BfsNode (source g) []] []
+initFlowMap :: [TEdge] -> Map.Map TEdge Word
+initFlowMap edges = (Map.fromList $ map (\e -> (e, 0::Word)) $ edges)
+
+findMaxFlowPath :: TGraph -> (Path, Word)
+findMaxFlowPath graph =
+    (\(flowMap, paths) -> (\x -> (x, getPathFlow flowMap x))
+        $ maximumBy (comparing (getPathFlow flowMap)) paths)
+        $ findMaxFlow graph [] (initFlowMap $ edges graph)
+
+findMaxFlow :: TGraph -> [Path] -> Map.Map TEdge Word -> (Map.Map TEdge Word, [Path])
+findMaxFlow graph paths flowMap 
+    | length path /= 0  = findMaxFlow newGraph (path:paths) newFlowMap
+    | length paths == 0 = (Map.empty, [])
+    | otherwise         = (Map.filter (>0) flowMap, paths)
+        where
+            path = bfs graph
+            newFlowMap = increaseFlow flowMap path flowIncrease
+            flowIncrease = getPathCapacity graph path
+            newGraph = createResidualGraph graph (getPathCapacity graph path) path
+
+bfs ::  TGraph -> Path
+bfs g = findBfs g (target g) [BfsNode (source g) []] []
 
 findBfs :: TGraph -> Node -> [TBfsNode] -> [Node] -> Path
 findBfs _ _ [] _ = []
@@ -73,7 +94,7 @@ findBfs (Graph nCnt  eCnt src tar edges cap) wanted (current:xs) explored
     | wanted == node current        = path current
     | otherwise                     = findBfs (Graph nCnt  eCnt src tar edges cap) wanted newQ newExplored
         where 
-            newExplored = explored ++ [node current] 
+            newExplored = (node current):explored 
             newQ = xs ++ 
                 map (\x -> BfsNode x (path current ++[Edge (node current) x])) 
                 (filter (`notElem` explored)
@@ -96,23 +117,24 @@ increaseFlow flowMap path newFlow
     | newFlow == 0 =    error "Increasing flow by 0!"
     | otherwise =       foldl (\flowMap edge -> case Map.lookup edge flowMap of 
                             Nothing -> error "Edge in flow map does not have capacity."
-                            Just prevFlow -> Map.insert edge (prevFlow + newFlow) flowMap
+                            Just prevFlow -> Map.insert edge (newFlow +  (Map.findWithDefault 0 edge flowMap)) flowMap
                             ) flowMap path
 
 createResidualGraph :: TGraph -> Word -> Path -> TGraph
 createResidualGraph (Graph nCnt eCnt src tar edges graphCapacities) flow path = 
-    Graph nCnt eCnt src tar (Map.keys $ capacities residualData) (Map.filter (>0) $capacities residualData)
-    where residualData = foldl (\(ResidualData edges newCapacities) edge -> if not $ Map.member edge graphCapacities then error ("Edge capacity not found." ++ show edge) else
-                case not $ Map.member (invertEdge edge) graphCapacities of
-                    False -> ResidualData edges newCapacities
-                        where 
-                            newCapacities = Map.insert (invertEdge edge) flow -- increase opposite edge capacity
-                                $ Map.adjust (subtract flow) edge newCapacities   -- decrease capacity
-
-                    True -> ResidualData edges newCapacities
-                        where
-                            newCapacities = Map.adjust (subtract flow) edge newCapacities   -- decrease capacity
+    Graph nCnt newEdgeCount src tar newEdges newCapacities
+    where 
+        newEdgeCount = fromIntegral $ length newEdges::Word
+        newEdges = (Map.keys newCapacities) 
+        newCapacities = (Map.filter (>0) (capacities residualData))
+        residualData = foldl (\(ResidualData edges resCapacities) edge -> 
+                if Map.notMember edge graphCapacities 
+                then error ("Edge capacity not found." ++ show edge) 
+                else (ResidualData edges (Map.insertWith (+) (invertEdge edge) flow 
+                    $ Map.adjust (subtract flow) edge resCapacities))
             ) (ResidualData edges graphCapacities) path
+
+
 
 --F[u, v] = F[u, v] - m       //This is reducing the residual capacity of the augmenting path
 --F[v, u] = F[v, u] + m
