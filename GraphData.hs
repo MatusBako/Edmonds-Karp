@@ -29,7 +29,6 @@ createEdges (x:xs)
     | length x == 2   = Edge (head x) (x!!1) : createEdges xs
     | otherwise         = error ("Prvok zoznamu " ++ show x ++ " nema dva prvky na vytvorenie hrany.")
 
-
 data TGraph = Graph {
     nodeCount :: Word,
     edgeCount :: Word,
@@ -66,6 +65,22 @@ invertEdge (Edge x y) = Edge y x
 
 initFlowMap :: [TEdge] -> Map.Map TEdge Word
 initFlowMap edges = (Map.fromList $ map (\e -> (e, 0::Word)) $ edges)
+
+printGraph :: TGraph -> IO ()
+printGraph (Graph nCnt  eCnt src tar edges cap) = 
+    putStrLn ("p max " ++ show nCnt ++ " " ++ show eCnt ++ "\n"
+        ++ "n " ++ show src ++ " s\n"
+        ++ "n " ++ show tar ++ " t\n"
+        ++ foldl1 (++) (
+            map (\(Edge n1 n2, c)->
+                "a " ++ show n1 ++ " " ++ show n2 ++ " " ++ show c ++"\n"
+            ) $ Map.toList cap)
+        )
+
+printPath :: Path -> IO () --TODO: DOKONCI
+printPath []    = print ""
+printPath path  = print $ (\(Edge n1 n2) -> show n1 ++ ",") (head path)
+    ++ ((\x -> take  ((length x)-1) x ) $ Prelude.foldl1 (++) $ Prelude.map (\(Edge n1 n2) -> show n2 ++ ",") path)
 
 findMaxFlowPath :: TGraph -> (Path, Word)
 findMaxFlowPath graph =
