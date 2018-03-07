@@ -28,9 +28,7 @@ flowTests = TestList [
     where 
         testPathCapacity = TestCase (assertEqual "Fix getting path capacity." 3 (getPathCapacity graph1 path11))
         testPathCapacity2 = TestCase (assertEqual "Fix getting path capacity." 2 (getPathCapacity graph1 path12))
-        testIncreaseFlow = TestCase $ assertEqual "Fix increasing path flow." 6 (sum $ Prelude.map (\edge -> case (Map.lookup edge (increaseFlow flow1 path12 2)) of 
-                                                            Nothing -> error "Edge in path does not have flow."
-                                                            Just flow -> flow) path12)
+        testIncreaseFlow = TestCase $ assertEqual "Fix increasing path flow." 2 (getPathFlow  (increaseFlow flow1 path12 2 )path12 )
 
 ---------------------- RESIDUAL GRAPH TESTS -----------------------
 
