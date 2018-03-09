@@ -64,7 +64,7 @@ invertEdge :: TEdge -> TEdge
 invertEdge (Edge x y) = Edge y x
 
 initFlowMap :: [TEdge] -> Map.Map TEdge Word
-initFlowMap edges = (Map.fromList $ map (\e -> (e, 0::Word)) $ edges)
+initFlowMap edges = Map.fromList $ map (\e -> (e, 0::Word)) edges
 
 printGraph :: TGraph -> IO ()
 printGraph (Graph nCnt  eCnt src tar edges cap) = 
@@ -77,21 +77,23 @@ printGraph (Graph nCnt  eCnt src tar edges cap) =
             ) $ Map.toList cap)
         )
 
-printPath :: Path -> IO () --TODO: DOKONCI
+printPath :: Path -> IO ()
 printPath []    = print ""
 printPath path  = print $ (\(Edge n1 n2) -> show n1 ++ ",") (head path)
-    ++ ((\x -> take  ((length x)-1) x ) $ Prelude.foldl1 (++) $ Prelude.map (\(Edge n1 n2) -> show n2 ++ ",") path)
+    ++ (\x -> take  (length x - 1 ) x ) (Prelude.foldl1 (++) $ Prelude.map (\(Edge n1 n2) -> show n2 ++ ",") path)
 
 findMaxFlowPath :: TGraph -> (Path, Word)
-findMaxFlowPath graph =
-    (\(flowMap, paths) -> (\x -> (x, getPathFlow flowMap x))
-        $ maximumBy (comparing (getPathFlow flowMap)) paths)
-        $ findMaxFlow graph [] (initFlowMap $ edges graph)
+findMaxFlowPath graph = if null $ snd maxFlow 
+    then ([], 0) 
+    else (\x -> (x, getPathFlow flowMap x)) $ maximumBy (comparing (getPathFlow flowMap)) $ snd maxFlow
+        where
+            maxFlow = findMaxFlow graph [] (initFlowMap $ edges graph)
+            flowMap = fst maxFlow
 
 findMaxFlow :: TGraph -> [Path] -> Map.Map TEdge Word -> (Map.Map TEdge Word, [Path])
 findMaxFlow graph paths flowMap 
-    | length path /= 0  = findMaxFlow newGraph (path:paths) newFlowMap
-    | length paths == 0 = (Map.empty, [])
+    | not $ null path   = findMaxFlow newGraph (path:paths) newFlowMap
+    | null paths        = (Map.empty, [])
     | otherwise         = (Map.filter (>0) flowMap, paths)
         where
             path = bfs graph
@@ -109,7 +111,7 @@ findBfs (Graph nCnt  eCnt src tar edges cap) wanted (current:xs) explored
     | wanted == node current        = path current
     | otherwise                     = findBfs (Graph nCnt  eCnt src tar edges cap) wanted newQ newExplored
         where 
-            newExplored = (node current):explored 
+            newExplored = node current:explored 
             newQ = xs ++ 
                 map (\x -> BfsNode x (path current ++[Edge (node current) x])) 
                 (filter (`notElem` explored)
@@ -132,7 +134,7 @@ increaseFlow flowMap path newFlow
     | newFlow == 0 =    error "Increasing flow by 0!"
     | otherwise =       foldl (\flowMap edge -> case Map.lookup edge flowMap of 
                             Nothing -> error "Edge in flow map does not have capacity."
-                            Just prevFlow -> Map.insert edge (newFlow +  (Map.findWithDefault 0 edge flowMap)) flowMap
+                            Just prevFlow -> Map.insert edge (newFlow +  Map.findWithDefault 0 edge flowMap) flowMap
                             ) flowMap path
 
 createResidualGraph :: TGraph -> Word -> Path -> TGraph
@@ -140,13 +142,13 @@ createResidualGraph (Graph nCnt eCnt src tar edges graphCapacities) flow path =
     Graph nCnt newEdgeCount src tar newEdges newCapacities
     where 
         newEdgeCount = fromIntegral $ length newEdges::Word
-        newEdges = (Map.keys newCapacities) 
-        newCapacities = (Map.filter (>0) (capacities residualData))
+        newEdges = Map.keys newCapacities
+        newCapacities = Map.filter (>0) (capacities residualData)
         residualData = foldl (\(ResidualData edges resCapacities) edge -> 
                 if Map.notMember edge graphCapacities 
                 then error ("Edge capacity not found." ++ show edge) 
-                else (ResidualData edges (Map.insertWith (+) (invertEdge edge) flow 
-                    $ Map.adjust (subtract flow) edge resCapacities))
+                else ResidualData edges (Map.insertWith (+) (invertEdge edge) flow 
+                    $ Map.adjust (subtract flow) edge resCapacities)
             ) (ResidualData edges graphCapacities) path
 
 
