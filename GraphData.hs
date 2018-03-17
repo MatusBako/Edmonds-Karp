@@ -15,6 +15,7 @@ type Path = [TEdge]
 instance Show TEdge where
   show (Edge a b ) = show a ++ "->" ++ show b
 
+-- Record used for finding path to node using BFS.
 data TBfsNode = BfsNode {
     node :: Node,
     path :: Path
@@ -22,12 +23,6 @@ data TBfsNode = BfsNode {
 
 instance Show TBfsNode where
     show (BfsNode n p) = "BfsNode: " ++ show n ++ " " ++ show p ++ "\n"
-
-createEdges :: [[Word]] -> [TEdge]
-createEdges []          = []
-createEdges (x:xs) 
-    | length x == 2   = Edge (head x) (x!!1) : createEdges xs
-    | otherwise         = error ("Prvok zoznamu " ++ show x ++ " nema dva prvky na vytvorenie hrany.")
 
 data TGraph = Graph {
     nodeCount :: Word,
@@ -38,6 +33,9 @@ data TGraph = Graph {
     capacity :: Map.Map TEdge Word
 }   deriving (Show, Eq) 
 
+-- Record holding residual graph.
+-- resEdges     - edges of residual graph
+-- capacities   - capacities of residual grapf
 data TResidualData = ResidualData {
     resEdges :: [TEdge],
     capacities :: Map.Map TEdge Word
@@ -67,19 +65,19 @@ initFlowMap :: [TEdge] -> Map.Map TEdge Word
 initFlowMap edges = Map.fromList $ map (\e -> (e, 0::Word)) edges
 
 printGraph :: TGraph -> IO ()
-printGraph (Graph nCnt  eCnt src tar edges cap) = 
+printGraph (Graph nCnt  eCnt src tar edges cap) =
     putStrLn ("p max " ++ show nCnt ++ " " ++ show eCnt ++ "\n"
         ++ "n " ++ show src ++ " s\n"
         ++ "n " ++ show tar ++ " t\n"
-        ++ foldl1 (++) (
+        ++ (init $ foldl1 (++) (
             map (\(Edge n1 n2, c)->
                 "a " ++ show n1 ++ " " ++ show n2 ++ " " ++ show c ++"\n"
-            ) $ Map.toList cap)
+            ) $ Map.toList cap))
         )
 
 printPath :: Path -> IO ()
-printPath []    = print ""
-printPath path  = print $ (\(Edge n1 n2) -> show n1 ++ ",") (head path)
+printPath []    = putStrLn ""
+printPath path  = putStrLn $ (\(Edge n1 n2) -> show n1 ++ ",") (head path)
     ++ (\x -> take  (length x - 1 ) x ) (Prelude.foldl1 (++) $ Prelude.map (\(Edge n1 n2) -> show n2 ++ ",") path)
 
 findMaxFlowPath :: TGraph -> (Path, Word)

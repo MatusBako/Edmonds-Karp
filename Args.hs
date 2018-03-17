@@ -32,7 +32,6 @@ parseOpts argv =
     where header = "Usage: ford-fulkerson [OPTION...] file"
 
 resolveOpts :: ([Flag], [String]) -> IO ()
-resolveOpts (flags, [])     = error "Missing input file path."
 resolveOpts (flags, other)
     | length other > 1      = error "Only one file argument is needed."
 resolveOpts ([], other)     = parseInput (head other)   >>= (\(InputData graph handle) -> hClose handle)
@@ -41,4 +40,4 @@ resolveOpts (flags, other)
     | (head flags) == Path  = parsedGraph >>= (\(InputData graph handle) -> (printPath $ fst $ findMaxFlowPath graph) >> hClose handle >> resolveOpts (tail flags, other))
     | (head flags) == Flow  = parsedGraph >>= (\(InputData graph handle) -> (print $ snd $ findMaxFlowPath graph) >> hClose handle >> resolveOpts (tail flags, other))
         where
-            parsedGraph = parseInput (head other)
+            parsedGraph = parseInput (if null other then "" else head other)
