@@ -5,7 +5,6 @@ import System.IO
 import Data.List
 import Text.Read
 import qualified Data.Map as Map
-import Debug.Trace
 
 data TInputData = InputData {
     graph :: TGraph,
@@ -29,7 +28,9 @@ parseInput filePath = do
 
 verifyInput :: IO TInputData -> IO TInputData
 verifyInput inputData  = inputData >>= (\(InputData graph handle) -> if 
-     (fromIntegral $ (edgeCount graph)::Word) /= (fromIntegral $ (length $ edges graph)::Word) then inputData else error "Edge count is different from actual number of edges.")
+     (fromIntegral $ (edgeCount graph)::Word) == (fromIntegral $ (length $ edges graph)::Word) 
+        then inputData 
+        else error "Edge count is different from actual number of edges.")
 
 exitParsing :: Handle -> String -> IO TInputData
 exitParsing handle errorMsg = hClose handle >>  error errorMsg
@@ -108,7 +109,10 @@ addSrcDest (InputData (Graph nCnt  eCnt src tar edges cap) handle) _ _ =
 addEdge :: TInputData -> TEdge -> Word -> IO TInputData
 addEdge (InputData (Graph nCnt eCnt src tar edges cap) handle) (Edge id1 id2) capacity
     | id1 == id2                = exitParsing handle "Selfloops are not allowed."
+    | id1 == 0 || id1 > nCnt    = exitParsing handle "Wrong node id when defining edge." 
+    | id2 == 0 || id2 > nCnt    = exitParsing handle "Wrong node id when defining edge." 
+
 
 addEdge (InputData (Graph nCnt eCnt src tar edges cap) handle) newEdge capacity
     | newEdge `elem` edges      = exitParsing handle "Edge can't be added more than once."
-    | otherwise                 = return (InputData (Graph nCnt  (eCnt+1) src tar (newEdge:edges) (Map.insert newEdge capacity cap)) handle)
+    | otherwise                 = return (InputData (Graph nCnt eCnt src tar (newEdge:edges) (Map.insert newEdge capacity cap)) handle)

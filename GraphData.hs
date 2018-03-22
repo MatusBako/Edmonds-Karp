@@ -4,7 +4,6 @@ import Data.List as List
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Ord
-import Debug.Trace
 
 ------- DATA TYPES ---------
 
@@ -53,8 +52,8 @@ setGraphDrain :: TGraph -> Word -> TGraph
 setGraphDrain g t = g { target = t}
 
 getNodeNeighbourds :: [TEdge] -> Node -> [Node]
-getNodeNeighbourds edges node = 
-    map (\(Edge x y) -> y) $ filter (\(Edge x y) -> x == node) edges
+getNodeNeighbourds graphEdges node = 
+    map (\(Edge _ y) -> y) $ filter (\(Edge x _) -> x == node) graphEdges
 
 ------- OPERATIONS ---------
 
@@ -62,10 +61,10 @@ invertEdge :: TEdge -> TEdge
 invertEdge (Edge x y) = Edge y x
 
 initFlowMap :: [TEdge] -> Map.Map TEdge Word
-initFlowMap edges = Map.fromList $ map (\e -> (e, 0::Word)) edges
+initFlowMap mapEdges = Map.fromList $ map (\e -> (e, 0::Word)) mapEdges
 
 printGraph :: TGraph -> IO ()
-printGraph (Graph nCnt  eCnt src tar edges cap) =
+printGraph (Graph nCnt  eCnt src tar _ cap) =
     putStrLn ("p max " ++ show nCnt ++ " " ++ show eCnt ++ "\n"
         ++ "n " ++ show src ++ " s\n"
         ++ "n " ++ show tar ++ " t\n"
@@ -77,8 +76,8 @@ printGraph (Graph nCnt  eCnt src tar edges cap) =
 
 printPath :: Path -> IO ()
 printPath []    = putStrLn ""
-printPath path  = putStrLn $ (\(Edge n1 n2) -> show n1 ++ ",") (head path)
-    ++ (\x -> take  (length x - 1 ) x ) (Prelude.foldl1 (++) $ Prelude.map (\(Edge n1 n2) -> show n2 ++ ",") path)
+printPath path  = putStrLn $ (\(Edge n1 _) -> show n1 ++ ",") (head path)
+    ++ (\x -> take  (length x - 1 ) x ) (Prelude.foldl1 (++) $ Prelude.map (\(Edge _ n2) -> show n2 ++ ",") path)
 
 findMaxFlowPath :: TGraph -> (Path, Word)
 findMaxFlowPath graph = if null $ snd maxFlow 
@@ -116,7 +115,7 @@ findBfs (Graph nCnt  eCnt src tar edges cap) wanted (current:xs) explored
                 $ getNodeNeighbourds edges (node current))
 
 getPathCapacity :: TGraph -> Path -> Word
-getPathCapacity (Graph nCnt  eCnt src tar edges capacities) path = minimum $ map 
+getPathCapacity (Graph _ _ _ _ edges capacities) path = minimum $ map 
     (\edge -> fromMaybe (error "Edge in path does not have capacity.")
         (Map.lookup edge capacities)
     ) path

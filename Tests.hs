@@ -7,6 +7,16 @@ import Debug.Trace
 
 ----------------------- CAPACITY AND FLOW TESTS --------------------
 
+flowTests = TestList [
+        TestLabel "Testing getting path capacity." testPathCapacity,
+        TestLabel "Testing getting path capacity." testPathCapacity2,
+        TestLabel "Testing increasing flow." testIncreaseFlow
+    ]
+    where 
+        testPathCapacity = TestCase (assertEqual "Fix getting path capacity." 3 (getPathCapacity graph1 path11))
+        testPathCapacity2 = TestCase (assertEqual "Fix getting path capacity." 2 (getPathCapacity graph1 path12))
+        testIncreaseFlow = TestCase $ assertEqual "Fix increasing path flow." 2 (getPathFlow  (increaseFlow flow1 path12 2 )path12 )
+
 edges1 = [Edge 1 2, Edge 1 3, Edge 3 2, Edge 3 5, Edge 4 5, Edge 4 2, Edge 5 3, Edge 3 1, Edge 2 5, Edge 5 1]
 capacities1 = (Map.fromList [(Edge 1 2,4), (Edge 1 3,5), (Edge 3 2,3), (Edge 3 5,6), (Edge 4 5,2), (Edge 5 2,3), 
                         (Edge 5 3,6), (Edge 3 1,2), (Edge 2 5,4), (Edge 5 1, 6)])
@@ -19,18 +29,13 @@ graph1 = (Graph 5 8 1 5 edges1 capacities1)
 path11 = [Edge 1 2, Edge 2 5, Edge 5 3, Edge 3 2]
 path12 = [Edge 4 5, Edge 5 1, Edge 1 3]
 
-
-flowTests = TestList [
-        TestLabel "Testing getting path capacity." testPathCapacity,
-        TestLabel "Testing getting path capacity." testPathCapacity2,
-        TestLabel "Testing increasing flow." testIncreaseFlow
-    ]
-    where 
-        testPathCapacity = TestCase (assertEqual "Fix getting path capacity." 3 (getPathCapacity graph1 path11))
-        testPathCapacity2 = TestCase (assertEqual "Fix getting path capacity." 2 (getPathCapacity graph1 path12))
-        testIncreaseFlow = TestCase $ assertEqual "Fix increasing path flow." 2 (getPathFlow  (increaseFlow flow1 path12 2 )path12 )
-
 ---------------------- RESIDUAL GRAPH TESTS -----------------------
+
+residualTests = TestList [
+        TestLabel "Testing creating residual graph." testResidual1,
+        TestLabel "Testing creating residual graph." testResidual2,
+        TestLabel "Testing creating residual graph." testResidual3
+    ]
 
 edgesRes1 = [Edge 1 2, Edge 2 1]
 capacitiesRes1 = (Map.fromList [(Edge 1 2,4), (Edge 2 1,3)])
@@ -73,12 +78,6 @@ graphRes3Result = (Graph 2 1 1 2 (Map.keys capacitiesRes3Result) capacitiesRes3R
 testResidual3 = TestCase (assertEqual "Fix creating residual graph." graphRes3Result (createResidualGraph graphRes3 flowRes3 pathRes3))
  
 main = createResidualGraph graphRes3 flowRes3 pathRes3
-
-residualTests = TestList [
-        TestLabel "Testing creating residual graph." testResidual1,
-        TestLabel "Testing creating residual graph." testResidual2,
-        TestLabel "Testing creating residual graph." testResidual3
-    ]
 
 ---------------------- MAX FLOW TESTS -----------------------
 
