@@ -23,4 +23,4 @@ run: $(BIN)
 	./$(BIN)
 
 tar:
-	tar -cf flp-fun-xbakom01.tar *.hs *.sh Makefile
+	zip -r flp-fun-xbakom01.tar TestInputs *.hs *.sh Makefile README.md
