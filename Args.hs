@@ -1,16 +1,9 @@
 module Args where  
 
-import Control.Monad
-import Data.Char
-import Data.List
-import Data.Maybe ( fromMaybe )
 import Dimacs
 import GraphData
 import System.Console.GetOpt
-import System.Environment
-import System.Exit
 import System.IO
-import Text.Printf
 
 data Flag
     = Input
@@ -18,6 +11,7 @@ data Flag
     | Path
     deriving (Show, Eq)
 
+options :: [OptDescr Flag]
 options =
     [ Option ['i']  []   (NoArg Input)  "Print parsed input."
     , Option ['f']  []   (NoArg Flow)   "Print maximal flow of a path in graph."
@@ -42,12 +36,15 @@ unify (x:xs)
     | otherwise     = x:unify xs
 
 resolveOpts :: ([Flag], [String]) -> IO ()
-resolveOpts (flags, other)
+resolveOpts (_, other)
     | length other > 1      = error "Only one file argument is needed."
-resolveOpts ([], other)     = parseInput (head other) >>= (\(InputData graph handle) -> hClose handle)
+resolveOpts ([], other)     = parsedGraph >>= (\(InputData _ handle) -> hClose handle)
+    where
+        parsedGraph = parseInput (if null other then "" else head other)
 resolveOpts (flags, other)
     | (head flags) == Input = parsedGraph >>= (\(InputData graph handle) -> printGraph graph >> hClose handle >> resolveOpts (tail flags, other))
     | (head flags) == Path  = parsedGraph >>= (\(InputData graph handle) -> (printPath $ fst $ findMaxFlowPath graph) >> hClose handle >> resolveOpts (tail flags, other))
     | (head flags) == Flow  = parsedGraph >>= (\(InputData graph handle) -> (print $ snd $ findMaxFlowPath graph) >> hClose handle >> resolveOpts (tail flags, other))
         where
             parsedGraph = parseInput (if null other then "" else head other)
+resolveOpts (_, _)          = error "Error while parsing arguments."
