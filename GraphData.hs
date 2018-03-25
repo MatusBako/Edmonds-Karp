@@ -16,8 +16,8 @@ instance Show TEdge where
 
 -- Record used for finding path to node using BFS.
 data TBfsNode = BfsNode {
-    node :: Node,
-    path :: Path
+    bfsNode :: Node,
+    bfsPath :: Path
 }
 
 instance Show TBfsNode where
@@ -33,10 +33,10 @@ data TGraph = Graph {
 }   deriving (Show, Eq) 
 
 -- Record holding residual graph.
--- resEdges     - edges of residual graph
+-- residualEdges     - edges of residual graph
 -- capacities   - capacities of residual grapf
 data TResidualData = ResidualData {
-    resEdges :: [TEdge],
+    residualEdges :: [TEdge],
     capacities :: Map.Map TEdge Word
 }
 
@@ -80,13 +80,25 @@ printPath path  = putStrLn $ (\(Edge n1 _) -> show n1 ++ ",") (head path)
     ++ (\x -> take  (length x - 1 ) x ) (Prelude.foldl1 (++) $ Prelude.map (\(Edge _ n2) -> show n2 ++ ",") path)
 
 findMaxFlowPath :: TGraph -> (Path, Word)
-findMaxFlowPath graph = if null $ snd maxFlow 
+findMaxFlowPath graph = if null $ snd maxFlowStruct 
     then ([], 0) 
-    else (\x -> (x, getPathFlow flowMap x)) $ maximumBy (comparing (getPathFlow flowMap)) $ snd maxFlow
+    else (maxPath, maxFlow)
         where
-            maxFlow = findMaxFlow graph [] (initFlowMap $ edges graph)
-            flowMap = fst maxFlow
+            maxFlowStruct = findMaxFlow graph [] (initFlowMap $ edges graph)
+            flowMap = fst maxFlowStruct
+            paths   = snd maxFlowStruct
+            maxPath = getMaxPath paths flowMap
+            maxFlow = getMaxFlow graph flowMap
 
+getMaxPath :: [Path] -> Map.Map TEdge Word -> Path
+getMaxPath [] _ = error "No path to target found."
+getMaxPath paths flowMap = maximumBy (comparing (getPathFlow flowMap)) paths
+
+
+getMaxFlow :: TGraph -> Map.Map TEdge Word -> Word
+getMaxFlow graph flowMap = sum $ Map.elems $ Map.filterWithKey (\(Edge _ e2) _ -> e2 == target graph) flowMap 
+
+-- Graph -> Queue -> FlowMap -> (FlowMap, Paths)
 findMaxFlow :: TGraph -> [Path] -> Map.Map TEdge Word -> (Map.Map TEdge Word, [Path])
 findMaxFlow graph paths flowMap 
     | not $ null path   = findMaxFlow newGraph (path:paths) newFlowMap
@@ -98,26 +110,29 @@ findMaxFlow graph paths flowMap
             flowIncrease = getPathCapacity graph path
             newGraph = createResidualGraph graph (getPathCapacity graph path) path
 
+-- Find path from source to target in graph using BFS.
 bfs ::  TGraph -> Path
 bfs g = findBfs g (target g) [BfsNode (source g) []] []
 
+-- Recursive function computing BFS in graph.
+-- Graph -> Target -> Queue -> Explored -> Path
 findBfs :: TGraph -> Node -> [TBfsNode] -> [Node] -> Path
 findBfs _ _ [] _ = []
-findBfs (Graph nCnt  eCnt src tar edges cap) wanted (current:xs) explored 
-    | node current `elem` explored  = findBfs (Graph nCnt  eCnt src tar edges cap) wanted xs explored
-    | wanted == node current        = path current
-    | otherwise                     = findBfs (Graph nCnt  eCnt src tar edges cap) wanted newQ newExplored
+findBfs (Graph nCnt  eCnt src tar edgs cap) wanted (current:xs) explored 
+    | bfsNode current `elem` explored   = findBfs (Graph nCnt  eCnt src tar edgs cap) wanted xs explored
+    | wanted == bfsNode current         = bfsPath current
+    | otherwise                         = findBfs (Graph nCnt  eCnt src tar edgs cap) wanted newQ newExplored
         where 
-            newExplored = node current:explored 
+            newExplored = bfsNode current:explored 
             newQ = xs ++ 
-                map (\x -> BfsNode x (path current ++[Edge (node current) x])) 
+                map (\x -> BfsNode x (bfsPath current ++[Edge (bfsNode current) x])) 
                 (filter (`notElem` explored)
-                $ getNodeNeighbourds edges (node current))
+                $ getNodeNeighbourds edgs (bfsNode current))
 
 getPathCapacity :: TGraph -> Path -> Word
-getPathCapacity (Graph _ _ _ _ edges capacities) path = minimum $ map 
+getPathCapacity (Graph _ _ _ _ _ edgeCapacities) path = minimum $ map 
     (\edge -> fromMaybe (error "Edge in path does not have capacity.")
-        (Map.lookup edge capacities)
+        (Map.lookup edge edgeCapacities)
     ) path
 
 getPathFlow :: Map.Map TEdge Word -> Path -> Word
@@ -129,34 +144,21 @@ getPathFlow flowMap path = minimum $ map
 increaseFlow :: Map.Map TEdge Word -> Path -> Word -> Map.Map TEdge Word
 increaseFlow flowMap path newFlow 
     | newFlow == 0 =    error "Increasing flow by 0!"
-    | otherwise =       foldl (\flowMap edge -> case Map.lookup edge flowMap of 
+    | otherwise =       foldl (\fMap edge -> case Map.lookup edge fMap of 
                             Nothing -> error "Edge in flow map does not have capacity."
-                            Just prevFlow -> Map.insert edge (newFlow +  Map.findWithDefault 0 edge flowMap) flowMap
+                            Just prevFlow -> Map.insert edge (newFlow + prevFlow) fMap
                             ) flowMap path
 
 createResidualGraph :: TGraph -> Word -> Path -> TGraph
-createResidualGraph (Graph nCnt eCnt src tar edges graphCapacities) flow path = 
+createResidualGraph (Graph nCnt _ src tar edgs graphCapacities) flow resPath = 
     Graph nCnt newEdgeCount src tar newEdges newCapacities
     where 
         newEdgeCount = fromIntegral $ length newEdges::Word
         newEdges = Map.keys newCapacities
         newCapacities = Map.filter (>0) (capacities residualData)
-        residualData = foldl (\(ResidualData edges resCapacities) edge -> 
+        residualData = foldl (\(ResidualData resEdges resCapacities) edge -> 
                 if Map.notMember edge graphCapacities 
                 then error ("Edge capacity not found." ++ show edge) 
-                else ResidualData edges (Map.insertWith (+) (invertEdge edge) flow 
+                else ResidualData resEdges (Map.insertWith (+) (invertEdge edge) flow 
                     $ Map.adjust (subtract flow) edge resCapacities)
-            ) (ResidualData edges graphCapacities) path
-
-
-
---F[u, v] = F[u, v] - m       //This is reducing the residual capacity of the augmenting path
---F[v, u] = F[v, u] + m
-
-{--
-foldl (-) 5 [1,2,3]
-5 - 1 - 2 - 3 = -1
-
-foldr (-) 5 [1,2,3]
-1 - (2 - (3 - 5)) = 1 - (2 - (-2)) = 1 - 4 = -3
---}
+            ) (ResidualData edgs graphCapacities) resPath
