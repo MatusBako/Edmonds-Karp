@@ -2,20 +2,19 @@ module Dimacs where
 
 import GraphData
 import System.IO
-import Data.List
 import Text.Read
 import qualified Data.Map as Map
 
 data TInputData = InputData {
-    graph :: TGraph,
-    handle :: Handle
+    inputGraph :: TGraph,
+    inputHandle :: Handle
 }
 
 parseInput :: String -> IO TInputData
 parseInput filePath = do 
-    handle <- case filePath of 
-        ""          -> return stdin
-        otherwise   -> openFile filePath ReadMode
+    handle <- if filePath == "" 
+        then return stdin
+        else openFile filePath ReadMode
 
     contents <- hGetContents handle 
 
@@ -24,13 +23,18 @@ parseInput filePath = do
             (lines contents)
 
     let graph = foldl parseLine ((\x -> return x) $ InputData (Graph 0 0 0 0 [] Map.empty) handle) fileLines
-    verifyInput $ graph
+    verifyIOInput $ graph
 
-verifyInput :: IO TInputData -> IO TInputData
-verifyInput inputData  = inputData >>= (\(InputData graph handle) -> if 
-     (fromIntegral $ (edgeCount graph)::Word) == (fromIntegral $ (length $ edges graph)::Word) 
-        then inputData 
-        else error "Edge count is different from actual number of edges.")
+verifyIOInput :: IO TInputData -> IO TInputData
+verifyIOInput inputData  = inputData >>= (\(InputData graph handle) -> verifyInput (InputData graph handle))
+
+verifyInput :: TInputData -> IO TInputData
+verifyInput (InputData graph handle)
+    | (fromIntegral $ (edgeCount graph)::Word) /= (fromIntegral $ (length $ edges graph)::Word) 
+        = error "Edge count is different from actual number of edges."
+    | source graph == 0 = error "Source node not given."
+    | target graph == 0 = error "Source node not given."
+    | otherwise     = return (InputData graph handle)
 
 exitParsing :: Handle -> String -> IO TInputData
 exitParsing handle errorMsg = hClose handle >>  error errorMsg
@@ -46,31 +50,32 @@ parseLine inputData line = inputData >>= (\(InputData graph handle) -> if
 
 
 parseCorrectLine :: TInputData -> Char -> String -> IO TInputData
-parseCorrectLine (InputData (Graph nCnt  eCnt src tar edges cap) handle) 'c' line = return (InputData (Graph nCnt  eCnt src tar edges cap) handle)
-parseCorrectLine (InputData (Graph nCnt  eCnt src tar edges cap) handle) 'p' line 
+parseCorrectLine inputData 'c' _ = 
+    return inputData
+parseCorrectLine (InputData (Graph _ _ src tar edgs cap) handle) 'p' line 
     | desc /= "max"                 = exitParsing handle "Second argument of line \"p\" is not \"max\"."
     | (length $ words line) /= 4    = exitParsing handle "Wrong line format, use following: n node s/t."
     | otherwise                     = case nStr of 
         Nothing -> exitParsing handle "Error occured while parsing edge count."
         Just n  -> case eStr of 
             Nothing -> exitParsing handle "Error occured while parsing edge count."
-            Just e  -> return (InputData (Graph n e src tar edges cap) handle) 
+            Just e  -> return (InputData (Graph n e src tar edgs cap) handle) 
         where 
             desc = words line!!1
             nStr = readMaybe $ words line!!2 :: Maybe Word
             eStr = readMaybe $ words line!!3 :: Maybe Word
 
-parseCorrectLine (InputData (Graph nCnt  eCnt src tar edges cap) handle) 'n' line 
+parseCorrectLine (InputData (Graph nCnt  eCnt src tar edgs cap) handle) 'n' line 
     | (length $ words line) /= 3        = exitParsing handle "Wrong line format, use following: n node s/t."
     | (length $ (words line)!!2) /= 1   = exitParsing handle "Mark the node as source or target (s/t)."
     | otherwise                         = case idStr of 
         Nothing -> exitParsing handle "Error occured while parsing source/target id."
-        Just id -> addSrcDest (InputData (Graph nCnt  eCnt src tar edges cap) handle) side id
+        Just nodeId -> addSrcDest (InputData (Graph nCnt  eCnt src tar edgs cap) handle) side nodeId
         where 
             idStr = readMaybe $ words line!!1 :: Maybe Word
             side =  head $ words line!!2
 
-parseCorrectLine (InputData (Graph nCnt  eCnt src tar edges cap) handle) 'a' line 
+parseCorrectLine (InputData (Graph nCnt  eCnt src tar edgs cap) handle) 'a' line 
     | (length $ words line) /= 4    = exitParsing handle "Wrong line format, use following: a node1 node2."
     | otherwise                     = case id1Str of
         Nothing -> exitParsing handle "Error while parsing forst id of edge."
@@ -78,41 +83,43 @@ parseCorrectLine (InputData (Graph nCnt  eCnt src tar edges cap) handle) 'a' lin
             Nothing -> exitParsing handle "Error while parsing second id of edge."
             Just id2 -> case capStr of 
                 Nothing -> exitParsing handle "Error while parsing capacity of edge."
-                Just capacity -> addEdge (InputData (Graph nCnt  eCnt src tar edges cap) handle) (Edge id1 id2) capacity
-                    where 
-                        newEdge = Edge id1 id2
+                Just newCapacity -> addEdge (InputData (Graph nCnt  eCnt src tar edgs cap) handle) (Edge id1 id2) newCapacity
         where   
             id1Str = readMaybe $ words line!!1 :: Maybe Word
             id2Str = readMaybe $ words line!!2 :: Maybe Word
             capStr = readMaybe $ words line!!3 :: Maybe Word
-parseCorrectLine (InputData (Graph nCnt  eCnt src tar edges cap) handle) _ line = exitParsing handle "Wrong starting symbol."
+parseCorrectLine (InputData _ handle) _ _
+    = exitParsing handle "Wrong starting symbol."
 
 
 addSrcDest :: TInputData -> Char -> Node -> IO TInputData
-addSrcDest (InputData (Graph nCnt  eCnt src tar edges cap) handle) _ node 
-    |  node == 0 || node > nCnt = exitParsing handle "Wrong node id when defining source or target." 
+addSrcDest (InputData (Graph nCnt  _ _ _ _ _) handle) _ newNode 
+    | newNode == 0 || newNode > nCnt = exitParsing handle "Wrong node id when defining source or target." 
 
-addSrcDest (InputData (Graph nCnt  eCnt src tar edges cap) handle) 's' node
+addSrcDest (InputData (Graph nCnt  eCnt src tar edgs cap) handle) 's' nodeId
     | src /= 0      = exitParsing handle "Source can't be added more than once."
-    | node == tar   = exitParsing handle "Source and target must be different."
-    | otherwise     = return (InputData (Graph nCnt  eCnt node tar edges cap) handle)
+    | nodeId == tar = exitParsing handle "Source and target must be different."
+    | nodeId == 0   = exitParsing handle "Source can't be 0."
+    | nodeId > nCnt = exitParsing handle "Source can't be bigger than node count."
+    | otherwise     = return (InputData (Graph nCnt  eCnt nodeId tar edgs cap) handle)
 
-addSrcDest (InputData (Graph nCnt  eCnt src tar edges cap) handle) 't' node
+addSrcDest (InputData (Graph nCnt  eCnt src tar edgs cap) handle) 't' nodeId
     | tar /= 0      = exitParsing handle "Target can't be added more than once."
-    | node == src   = exitParsing handle "Source and target must be different."
-    | otherwise     = return (InputData (Graph nCnt  eCnt src node edges cap) handle)
+    | nodeId == src = exitParsing handle "Target and target must be different."
+    | nodeId == 0   = exitParsing handle "Target can't be 0."
+    | nodeId > nCnt = exitParsing handle "Target can't be bigger than node count."
+    | otherwise     = return (InputData (Graph nCnt  eCnt src nodeId edgs cap) handle)
 
-addSrcDest (InputData (Graph nCnt  eCnt src tar edges cap) handle) _ _ = 
+addSrcDest (InputData _ handle) _ _ = 
     exitParsing handle "Choose source or target (s/t)."
 
 
 addEdge :: TInputData -> TEdge -> Word -> IO TInputData
-addEdge (InputData (Graph nCnt eCnt src tar edges cap) handle) (Edge id1 id2) capacity
+addEdge (InputData (Graph nCnt _ _ _ _ _) handle) (Edge id1 id2) _
     | id1 == id2                = exitParsing handle "Selfloops are not allowed."
     | id1 == 0 || id1 > nCnt    = exitParsing handle "Wrong node id when defining edge." 
     | id2 == 0 || id2 > nCnt    = exitParsing handle "Wrong node id when defining edge." 
 
-
-addEdge (InputData (Graph nCnt eCnt src tar edges cap) handle) newEdge capacity
-    | newEdge `elem` edges      = exitParsing handle "Edge can't be added more than once."
-    | otherwise                 = return (InputData (Graph nCnt eCnt src tar (newEdge:edges) (Map.insert newEdge capacity cap)) handle)
+addEdge (InputData (Graph nCnt eCnt src tar edgs cap) handle) newEdge newCapacity
+    | newEdge `elem` edgs      = exitParsing handle "Edge can't be added more than once."
+    | otherwise                 = return (InputData (Graph nCnt eCnt src tar (newEdge:edgs) (Map.insert newEdge newCapacity cap)) handle)
