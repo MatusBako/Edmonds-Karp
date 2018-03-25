@@ -11,7 +11,6 @@ input_file=(
     "more_edges.in"
     "no_source.in"
     "no_target.in"
-    "no_access.in"
     "no_problem.in"
     "correct1.in"
     "correct2.in"
@@ -24,18 +23,18 @@ input_file=(
 );
 
 RC=(
-    1 1 1 1 1 1 1 1
+    1 1 1 1 1 1 1 
     0 0 0 0 0 0 0 0 
 );
 
 ARGS=(
-    "" "" "" "" "" "" "" "" 
+    "" "" "" "" "" "" ""
     "-f" "-f" "-f" "-f" 
     "-v" "-v" "-v" "-v" 
 );
 
 OUTPUTS=(
-    "" "" "" "" "" "" "" "" 
+    "" "" "" "" "" "" "" 
     "7" 
     "25" 
     "9" 
@@ -73,16 +72,6 @@ for i in `seq 0 $((${#input_file[@]} - 1))`; do
 
     echo
 done
-
-: <<'comment'
-for input_file in `ls ./InputTests`; do
-    echo "--- TEST of $input_file ---"
-    ./Ford ./InputTests/$input_file >/dev/null 
-    echo "RC: $?"
-done
-comment
-
-#${#ArrayName[@]}
 
 
 
