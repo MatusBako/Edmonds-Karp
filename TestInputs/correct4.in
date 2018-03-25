@@ -1,0 +1,11 @@
+c modified 'graph 2' from https://www-m9.ma.tum.de/graph-algorithms/flow-ford-fulkerson/index_en.html
+c max flow: 0
+c max cap. path: none - source and target node are not connected
+p max 6 5
+n 1 s
+n 6 t
+a 4 2 5
+a 5 4 5
+a 3 5 7
+a 5 6 15
+a 1 2 10
