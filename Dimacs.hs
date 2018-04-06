@@ -10,6 +10,7 @@ data TInputData = InputData {
     inputHandle :: Handle
 }
 
+-- Open load graph from argument or stdin and create graph.
 parseInput :: String -> IO TInputData
 parseInput filePath = do 
     handle <- if filePath == "" 
@@ -25,6 +26,7 @@ parseInput filePath = do
     let graph = foldl parseLine ((\x -> return x) $ InputData (Graph 0 0 0 0 [] Map.empty) handle) fileLines
     verifyIOInput $ graph
 
+
 verifyIOInput :: IO TInputData -> IO TInputData
 verifyIOInput inputData  = inputData >>= (\(InputData graph handle) -> verifyInput (InputData graph handle))
 
@@ -39,6 +41,7 @@ verifyInput (InputData graph handle)
 exitParsing :: Handle -> String -> IO TInputData
 exitParsing handle errorMsg = hClose handle >>  error errorMsg
 
+-- Initial error checking on each line.
 parseLine :: IO TInputData -> String -> IO TInputData
 parseLine inputData ""   = inputData
 parseLine inputData line = inputData >>= (\(InputData graph handle) -> if 
@@ -48,10 +51,9 @@ parseLine inputData line = inputData >>= (\(InputData graph handle) -> if
     where
         firstWord = (words  line)!!0
 
-
+-- Parse each line type.
 parseCorrectLine :: TInputData -> Char -> String -> IO TInputData
-parseCorrectLine inputData 'c' _ = 
-    return inputData
+parseCorrectLine inputData 'c' _ = return inputData
 parseCorrectLine (InputData (Graph _ _ src tar edgs cap) handle) 'p' line 
     | desc /= "max"                 = exitParsing handle "Second argument of line \"p\" is not \"max\"."
     | (length $ words line) /= 4    = exitParsing handle "Wrong line format, use following: n node s/t."

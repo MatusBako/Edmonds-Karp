@@ -4,5 +4,5 @@ import System.Environment
 
 main :: IO ()
 main = do
-    getArgs >>= parseOpts >>= resolveOpts
+    getArgs >>= parseOpts >>= loadAndExecute
     

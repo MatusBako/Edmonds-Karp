@@ -79,6 +79,7 @@ printPath []    = putStrLn ""
 printPath path  = putStrLn $ (\(Edge n1 _) -> show n1 ++ ",") (head path)
     ++ (\x -> take  (length x - 1 ) x ) (Prelude.foldl1 (++) $ Prelude.map (\(Edge _ n2) -> show n2 ++ ",") path)
 
+-- Find path with maximal flow
 findMaxFlowPath :: TGraph -> (Path, Word)
 findMaxFlowPath graph = if null $ snd maxFlowStruct 
     then ([], 0) 
@@ -90,11 +91,12 @@ findMaxFlowPath graph = if null $ snd maxFlowStruct
             maxPath = getMaxPath paths flowMap
             maxFlow = getMaxFlow graph flowMap
 
+-- Get path with maximal flow out of given paths
 getMaxPath :: [Path] -> Map.Map TEdge Word -> Path
 getMaxPath [] _ = error "No path to target found."
 getMaxPath paths flowMap = maximumBy (comparing (getPathFlow flowMap)) paths
 
-
+-- Get flow in given path
 getMaxFlow :: TGraph -> Map.Map TEdge Word -> Word
 getMaxFlow graph flowMap = sum $ Map.elems $ Map.filterWithKey (\(Edge _ e2) _ -> e2 == target graph) flowMap 
 

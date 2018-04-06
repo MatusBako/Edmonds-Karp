@@ -11,6 +11,11 @@ data Flag
     | Path
     deriving (Show, Eq)
 
+data TArgData = ArgData {
+    inputData :: TInputData,
+    argFlags :: [Flag]
+}
+
 options :: [OptDescr Flag]
 options =
     [ Option ['i']  []   (NoArg Input)  "Print parsed input."
@@ -35,16 +40,24 @@ unify (x:xs)
     | x `elem` xs   = unify xs
     | otherwise     = x:unify xs
 
-resolveOpts :: ([Flag], [String]) -> IO ()
-resolveOpts (_, other)
-    | length other > 1      = error "Only one file argument is needed."
-resolveOpts ([], other)     = parsedGraph >>= (\(InputData _ handle) -> hClose handle)
+
+loadAndExecute :: ([Flag], [String]) -> IO ()
+loadAndExecute (_, other)
+    | length other > 1          = error "Only one file argument is needed."
+loadAndExecute (flags, other)   = parsedGraph >>= (
+        \(InputData graph handle) -> resolveOpts (ArgData (InputData graph handle) flags)
+    )
     where
         parsedGraph = parseInput (if null other then "" else head other)
-resolveOpts (flags, other)
-    | (head flags) == Input = parsedGraph >>= (\(InputData graph handle) -> printGraph graph >> hClose handle >> resolveOpts (tail flags, other))
-    | (head flags) == Path  = parsedGraph >>= (\(InputData graph handle) -> (printPath $ fst $ findMaxFlowPath graph) >> hClose handle >> resolveOpts (tail flags, other))
-    | (head flags) == Flow  = parsedGraph >>= (\(InputData graph handle) -> (print $ snd $ findMaxFlowPath graph) >> hClose handle >> resolveOpts (tail flags, other))
-        where
-            parsedGraph = parseInput (if null other then "" else head other)
-resolveOpts (_, _)          = error "Error while parsing arguments."
+
+
+-- (ArgData (InputData graph handle) flags)
+
+resolveOpts :: TArgData -> IO ()
+--resolveOpts (ArgData (InputData graph handle) [])
+resolveOpts (ArgData (InputData _ handle) [])   = hClose handle
+resolveOpts (ArgData (InputData graph handle) flags)
+    | (head flags) == Input = printGraph graph >> resolveOpts (ArgData (InputData graph handle) (tail flags))
+    | (head flags) == Path  = (printPath $ fst $ findMaxFlowPath graph) >> resolveOpts (ArgData (InputData graph handle) (tail flags))
+    | (head flags) == Flow  = (print $ snd $ findMaxFlowPath graph) >> resolveOpts (ArgData (InputData graph handle) (tail flags))
+resolveOpts _   = error "Error while parsing arguments."

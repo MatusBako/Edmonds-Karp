@@ -22,5 +22,5 @@ test: $(TEST)
 run: $(BIN)
 	./$(BIN)
 
-tar:
-	zip -r flp-fun-xbakom01.tar TestInputs *.hs *.sh Makefile README.md
+zip:
+	zip -r flp-fun-xbakom01.zip TestInputs *.hs *.sh Makefile README.md
